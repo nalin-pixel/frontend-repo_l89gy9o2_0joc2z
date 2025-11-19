@@ -1,32 +1,77 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
 
 export default function GadgetGrid() {
   const [gadgets, setGadgets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/gadgets`);
+      if (!res.ok) throw new Error('Failed to fetch gadgets');
+      const data = await res.json();
+      setGadgets(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`${API_BASE}/api/gadgets`);
-        if (!res.ok) throw new Error('Failed to fetch gadgets');
-        const data = await res.json();
-        setGadgets(data);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    }
     load();
-  }, []);
+  }, [load]);
+
+  async function handleSeed() {
+    try {
+      setSeeding(true);
+      setMessage('');
+      const res = await fetch(`${API_BASE}/api/seed/gadgets`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to seed gadgets');
+      const data = await res.json();
+      setMessage(`Added ${data.inserted || 0} gadgets with images.`);
+      await load();
+    } catch (e) {
+      console.error(e);
+      setMessage('Could not add images. Please try again.');
+    } finally {
+      setSeeding(false);
+      setTimeout(() => setMessage(''), 4000);
+    }
+  }
 
   return (
     <section id="gadgets" className="relative bg-gradient-to-b from-black to-slate-950 py-16 px-6">
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-3xl font-bold text-white">Gadgets</h2>
-        <p className="text-slate-300 mt-2">Essential tools of the Caped Crusader.</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-white">Gadgets</h2>
+            <p className="text-slate-300 mt-2">Essential tools of the Caped Crusader.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur border border-white/10 hover:bg-white/20 disabled:opacity-50"
+              title="Add sample gadgets with images"
+            >
+              {seeding ? 'Adding images…' : 'Add images'}
+            </button>
+            <button
+              onClick={load}
+              className="rounded-full bg-white/5 px-4 py-2 text-sm text-slate-200 border border-white/10 hover:bg-white/10"
+              title="Refresh"
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {message && <p className="mt-3 text-sm text-blue-300/90">{message}</p>}
 
         {loading ? (
           <p className="mt-8 text-slate-400">Loading gadgets...</p>
@@ -52,6 +97,12 @@ export default function GadgetGrid() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {!loading && gadgets.length === 0 && (
+          <div className="mt-8 text-slate-400 text-sm">
+            No gadgets yet. Click "Add images" to populate sample gadgets.
           </div>
         )}
       </div>

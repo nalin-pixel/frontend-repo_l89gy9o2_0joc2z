@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
 
@@ -17,22 +17,44 @@ export default function BatmobileGallery() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('year-desc');
   const [open, setOpen] = useState(null); // selected item for modal
+  const [seeding, setSeeding] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/batmobiles`);
+      if (!res.ok) throw new Error('Failed to fetch batmobiles');
+      const data = await res.json();
+      setItems(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`${API_BASE}/api/batmobiles`);
-        if (!res.ok) throw new Error('Failed to fetch batmobiles');
-        const data = await res.json();
-        setItems(data);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    }
     load();
-  }, []);
+  }, [load]);
+
+  async function handleSeed() {
+    try {
+      setSeeding(true);
+      setMessage('');
+      const res = await fetch(`${API_BASE}/api/seed/batmobiles`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to seed batmobiles');
+      const data = await res.json();
+      setMessage(`Added ${data.inserted || 0} batmobiles with images.`);
+      await load();
+    } catch (e) {
+      console.error(e);
+      setMessage('Could not add images. Please try again.');
+    } finally {
+      setSeeding(false);
+      setTimeout(() => setMessage(''), 4000);
+    }
+  }
 
   const filteredSorted = useMemo(() => {
     let data = items;
@@ -96,6 +118,25 @@ export default function BatmobileGallery() {
                 <option value="name-asc">Name (A → Z)</option>
               </select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur border border-white/10 hover:bg-white/20 disabled:opacity-50"
+              title="Add sample batmobiles with images"
+            >
+              {seeding ? 'Adding images…' : 'Add images'}
+            </button>
+            <button
+              onClick={load}
+              className="rounded-full bg-white/5 px-4 py-2 text-sm text-slate-200 border border-white/10 hover:bg-white/10"
+              title="Refresh"
+            >
+              Refresh
+            </button>
+            {message && <span className="text-sm text-blue-300/90">{message}</span>}
           </div>
         </div>
 
